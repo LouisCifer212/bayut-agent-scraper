@@ -1,63 +1,52 @@
-// Bayut Agent Scraper – Apify Actor (Playwright)
+import { PlaywrightCrawler, Dataset, log } from 'crawlee';
 
-import { Actor, Dataset } from 'apify';
-import { PlaywrightCrawler } from 'crawlee';
+const startUrls = ['https://www.bayut.com/brokers/?page=1'];
 
-await Actor.init();
-
-// ---------- INPUT ----------
-const input        = await Actor.getInput() || {};
-const START_URL    = input.startUrl || 'https://www.bayut.com/brokers/';
-const MAX_PAGES    = Number(input.maxPages || 10);
-const proxyConfig  = await Actor.createProxyConfiguration({ useApifyProxy: true });
-
-// ---------- BUILD REQUEST LIST ----------
-const startRequests = Array.from({ length: MAX_PAGES }, (_, i) => ({
-    url  : `${START_URL}?page=${i + 1}`,
-    label: 'LIST',
-}));
-
-// ---------- CRAWLER ----------
 const crawler = new PlaywrightCrawler({
-    proxyConfiguration : proxyConfig,
-    headless           : true,
-    maxConcurrency     : 5,
-    requestHandler: async ({ request, page, enqueueLinks, log }) => {
+    requestHandlerTimeoutSecs: 180,
+    navigationTimeoutSecs: 120,
+    maxConcurrency: 2,
+    headless: true,
 
-        // ------ LIST PAGE ------
-        if (request.label === 'LIST') {
-            await page.waitForSelector('a[href^="/brokers/"]:not([href*="?page="])', { timeout: 15000 });
+    requestHandler: async ({ request, page, enqueueLinks }) => {
+        log.info(`Processing: ${request.url}`);
 
-            await enqueueLinks({
-                selector : 'a[href^="/brokers/"]:not([href*="?page="])',
-                baseUrl  : 'https://www.bayut.com',
-                label    : 'DETAIL',
-            });
-            return;
-        }
+        // Header realistici
+        await page.route('**/*', (route, request) => {
+            const headers = {
+                ...request.headers(),
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+                              '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+            };
+            route.continue({ headers });
+        });
 
-        // ------ DETAIL PAGE ------
-        if (request.label === 'DETAIL') {
-            await page.waitForSelector('h1[data-testid="agency-profile-name"]', { timeout: 15000 });
+        // Disabilita "navigator.webdriver"
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        });
 
-            const data = await page.evaluate(() => {
-                const pick = sel => document.querySelector(sel)?.textContent?.trim() || '';
-                return {
-                    name       : pick('h1[data-testid="agency-profile-name"]'),
-                    phone      : document.querySelector('a[href^="tel:"]')?.textContent?.trim() || '',
-                    city       : pick('span[data-testid="agency-location"]'),
-                    listings   : pick('span[data-testid="listing-count"]'),
-                    profileUrl : location.href,
-                };
-            });
+        await page.goto(request.url, { waitUntil: 'domcontentloaded' });
 
-            if (data.name) {
-                await Dataset.pushData(data);
-                log.info(`Saved: ${data.name}`);
-            }
+        const agents = await page.$$eval('.b7f530b3', (elements) =>
+            elements.map((el) => {
+                const name = el.querySelector('h2')?.innerText || '';
+                const phone = el.querySelector('a[href^="tel:"]')?.innerText || '';
+                const agency = el.querySelector('.c0df3811')?.innerText || '';
+                return { name, phone, agency };
+            })
+        );
+
+        await Dataset.pushData(agents);
+
+        // Pagine successive
+        const currentPage = Number(new URL(request.url).searchParams.get('page')) || 1;
+        if (currentPage < 10) {
+            const nextPage = currentPage + 1;
+            await crawler.addRequests([`https://www.bayut.com/brokers/?page=${nextPage}`]);
         }
     },
 });
 
-await crawler.run(startRequests);
-await Actor.exit();
+await crawler.run(startUrls);
