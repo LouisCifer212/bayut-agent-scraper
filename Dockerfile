@@ -1,11 +1,9 @@
-# Usa l'immagine con Playwright già installato
-FROM apify/actor-node-playwright-chrome:20
+FROM apify/actor-node-playwright:latest
 
-# Copia tutto il contenuto della repo dentro il container
+COPY package.json ./
+COPY package-lock.json ./
+RUN npm install
+
 COPY . ./
 
-# Installa solo le dipendenze di produzione, senza quelle opzionali
-RUN npm install --quiet --only=prod --no-optional && (npm list || true)
-
-# Specifica il comando che verrà eseguito all'avvio
 CMD ["node", "main.js"]
