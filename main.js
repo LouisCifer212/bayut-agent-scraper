@@ -1,52 +1,61 @@
-import { PlaywrightCrawler, Dataset, log } from 'crawlee';
+import { Actor, Dataset } from 'apify';
+import { PlaywrightCrawler } from 'crawlee';
 
-const startUrls = ['https://www.bayut.com/brokers/?page=1'];
+await Actor.init();
+const { startPage = 1, endPage = 10 } = await Actor.getInput() ?? {};
+
+const startRequests = [];
+for (let p = startPage; p <= endPage; p++) {
+    startRequests.push({ url: `https://www.bayut.com/brokers/?page=${p}`, label: 'LIST' });
+}
 
 const crawler = new PlaywrightCrawler({
-    requestHandlerTimeoutSecs: 180,
-    navigationTimeoutSecs: 120,
-    maxConcurrency: 2,
     headless: true,
+    maxConcurrency: 1,              // un browser alla volta → RAM ‹ 500 MB
+    navigationTimeoutSecs: 90,
+    proxyConfiguration: await Actor.createProxyConfiguration(),
+    preNavigationHooks: [
+        async ({ page }) => {
+            // blocca immagini / video
+            await page.route('**/*.{png,jpg,jpeg,svg,gif,webp,mp4}', r => r.abort());
+            // header e webdriver stealth
+            await page.addInitScript(() => Object.defineProperty(navigator, 'webdriver', { get: () => false }));
+        },
+    ],
+    requestHandler: async ({ request, page, enqueueLinks, log }) => {
+        if (request.label === 'LIST') {
+            // link dei broker presenti nel listato
+            await page.waitForSelector('a[data-testid="broker-card-link"]', { timeout: 15000 });
+            await enqueueLinks({
+                selector: 'a[data-testid="broker-card-link"]',
+                baseUrl: 'https://www.bayut.com',
+                label: 'DETAIL',
+            });
+            return;
+        }
 
-    requestHandler: async ({ request, page, enqueueLinks }) => {
-        log.info(`Processing: ${request.url}`);
+        if (request.label === 'DETAIL') {
+            await page.waitForSelector('a[href^="tel:"]', { timeout: 15000 });
 
-        // Header realistici
-        await page.route('**/*', (route, request) => {
-            const headers = {
-                ...request.headers(),
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-                              '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-            };
-            route.continue({ headers });
-        });
+            const data = await page.evaluate(() => {
+                const pick = sel => document.querySelector(sel)?.textContent?.trim() || '';
+                return {
+                    name:  pick('h1') || pick('[data-testid="agency-name"]'),
+                    phone: document.querySelector('a[href^="tel:"]')?.textContent?.trim() || '',
+                    city:  pick('[data-testid="agency-location"]'),
+                    listings: pick('[data-testid="listing-count"]'),
+                    profileUrl: location.href,
+                };
+            });
 
-        // Disabilita "navigator.webdriver"
-        await page.addInitScript(() => {
-            Object.defineProperty(navigator, 'webdriver', { get: () => false });
-        });
-
-        await page.goto(request.url, { waitUntil: 'domcontentloaded' });
-
-        const agents = await page.$$eval('.b7f530b3', (elements) =>
-            elements.map((el) => {
-                const name = el.querySelector('h2')?.innerText || '';
-                const phone = el.querySelector('a[href^="tel:"]')?.innerText || '';
-                const agency = el.querySelector('.c0df3811')?.innerText || '';
-                return { name, phone, agency };
-            })
-        );
-
-        await Dataset.pushData(agents);
-
-        // Pagine successive
-        const currentPage = Number(new URL(request.url).searchParams.get('page')) || 1;
-        if (currentPage < 10) {
-            const nextPage = currentPage + 1;
-            await crawler.addRequests([`https://www.bayut.com/brokers/?page=${nextPage}`]);
+            if (data.name && data.phone) {
+                await Dataset.pushData(data);
+                log.info(`Saved: ${data.name}`);
+            }
+            await page.close();      // libera memoria subito
         }
     },
 });
 
-await crawler.run(startUrls);
+await crawler.run(startRequests);
+await Actor.exit();
