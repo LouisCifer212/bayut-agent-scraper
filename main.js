@@ -18,9 +18,13 @@ const crawler = new PlaywrightCrawler({
 
         if (url.includes('/brokers/') && !url.includes('/page-')) {
             // LIST PAGE – enqueue broker profiles
-            await enqueueLinks({
-                selector: 'a[data-testid="broker-card-link"]',
-                label: 'DETAIL',
+await enqueueLinks({
+    // nuovo selettore, prende tutti i link che iniziano con /brokers/ e NON hanno di nuovo ?page=
+    selector: 'a[href^="/brokers/"]:not([href*="?page="])',
+    baseUrl: 'https://www.bayut.com',
+    label: 'DETAIL',
+});
+
             });
         } else if (request.label === 'DETAIL') {
             // DETAIL PAGE – extract data
