@@ -1,18 +1,17 @@
 {
   "name": "bayut-agent-scraper",
   "version": "0.1.0",
-  "description": "Apify Actor scraping Bayut broker directory",
+  "description": "Apify Actor scraping Bayut broker directory (stealth)",
   "main": "main.js",
+  "type": "module",
   "scripts": {
     "start": "node main.js"
   },
   "dependencies": {
-  "apify": "^3.4.2",
-  "crawlee": "^3.13.4",
-  "playwright-extra": "^2.4.0",
-  "playwright-extra-plugin-stealth": "^2.4.8"
-}
+    "apify": "^3.4.2",
+    "crawlee": "^3.13.4",
+    "playwright-extra": "^2.4.0",
+    "playwright-extra-plugin-stealth": "^2.4.8"
   },
-  "type": "module",
   "license": "MIT"
 }
