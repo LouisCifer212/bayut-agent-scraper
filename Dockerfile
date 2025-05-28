@@ -1,7 +1,8 @@
 FROM apify/actor-node-playwright:latest
 
 COPY package.json ./
-COPY package-lock.json ./
+# RIMUOVI o COMMENTA la riga sotto
+# COPY package-lock.json ./
 RUN npm install
 
 COPY . ./
