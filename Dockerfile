@@ -1,5 +1,5 @@
 # Usa l'immagine con Playwright già installato
-FROM apify/actor-node-playwright:20
+FROM apify/actor-node-playwright-chrome:20
 
 # Copia tutto il contenuto della repo dentro il container
 COPY . ./
