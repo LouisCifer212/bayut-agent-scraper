@@ -1,65 +1,67 @@
+# Bayut WhatsApp Scraper (Playwright)
 
-# Bayut WhatsApp Scraper
-
-A Python Selenium-based scraper to extract real estate agent WhatsApp mobile numbers from Bayut’s Ras Al Khaimah brokers directory.
+A cloud-friendly Python web app to extract real estate agent WhatsApp numbers from Bayut’s brokers directory, using Playwright and Streamlit.
 
 ## 🚀 Features
 
-- Clicks WhatsApp buttons to reveal hidden mobile numbers
-- Extracts agent name, agency, WhatsApp number, and profile link
-- Handles pagination to scrape multiple pages automatically
-- Exports results to JSON for easy integration with CRMs (like GoHighLevel)
-- Headless or visible browser mode for debugging or background runs
-- Robust error handling and logging
+- Scrapes WhatsApp numbers from Bayut agent listings
+- Supports all major UAE locations (Dubai, Abu Dhabi, Ras Al Khaimah, etc.)
+- Scrapes up to 50 pages per location (configurable)
+- Download results as JSON or CSV
+- Runs on Render, no Chrome/Selenium headaches
 
 ## 📦 Files
 
-- `bayut_whatsapp_scraper.py` — Main scraper script (Selenium)
-- `requirements_selenium.txt` — Python dependencies
-- `bayut_scraper_setup.md` — Setup and usage instructions
+- `app.py` — Streamlit web app
+- `bayut_whatsapp_scraper.py` — Playwright-based scraper logic
+- `requirements.txt` — Python dependencies
+- `render.yaml` — Render deployment config
+- `README.md` — This documentation
 
 ## 🛠️ Setup
 
-1. Install Chrome browser (if not already installed)
-2. Install Python dependencies:
-pip install -r requirements_selenium.txt
+### 1. **Clone the Repo**
 
-3. (Optional) Install ChromeDriver automatically:
-```python
-from webdriver_manager.chrome import ChromeDriverManager
-ChromeDriverManager().install()
-⚡ Usage
-python
+```bash
+git clone https://github.com/yourusername/bayut-agent-scraper.git
+cd bayut-agent-scraper
+2. Install Python Dependencies
+bash
 Copy
-from bayut_whatsapp_scraper import BayutWhatsAppScraper
-
-# Create scraper (set headless=False to watch browser, True for background)
-scraper = BayutWhatsAppScraper(headless=False)
-
-# Scrape agents from Ras Al Khaimah (max 3 pages)
-agents = scraper.scrape_bayut_brokers(location="ras-al-khaimah", max_pages=3)
-
-print(f"Found {len(agents)} agents with WhatsApp numbers!")
+pip install -r requirements.txt
+playwright install chromium
+3. Run the App Locally
+bash
+Copy
+streamlit run app.py
+4. Deploy to Render
+Make sure your repo includes render.yaml with the following build command:
+pip install -r requirements.txt
+playwright install chromium
+Set the start command to:
+streamlit run app.py --server.port $PORT
+⚡ Usage
+Select the location and number of pages in the web app.
+Click "Scrape WhatsApp Numbers".
+Download the results as JSON or CSV.
 📝 Output Example
 json
 Copy
-{
-  "name": "Afreen Naaz",
-  "agency": "Some Real Estate Agency",
-  "whatsapp_number": "+971545695868",
-  "profile_link": "https://www.bayut.com/brokers/afreen-naaz-2401461/...",
-  "location": "Ras Al Khaimah",
-  "source": "Bayut"
-}
+[
+  {
+    "name": "Afreen Naaz",
+    "agency": "Some Real Estate Agency",
+    "whatsapp_number": "+971545695868",
+    "profile_link": "https://www.bayut.com/brokers/afreen-naaz-2401461/...",
+    "location": "Ras Al Khaimah",
+    "source": "Bayut",
+    "page": 1
+  }
+]
 💡 Tips
-Start with headless=False to see the browser in action.
-Use max_pages=1 for quick tests, then increase for full scraping.
-Check the JSON output to verify data quality.
-The scraper is designed to be respectful with delays and error handling.
-📲 Next Steps
-Integrate the output with your CRM (e.g., GoHighLevel)
-Use the WhatsApp numbers for direct outreach or campaigns
-Automate the script for regular data updates
+If you get empty results, try a different location or more pages.
+If the site structure changes, update the selectors in bayut_whatsapp_scraper.py.
+For large scrapes, start with a small number of pages to test.
 ⚠️ Disclaimer
 For personal/research use only.
 Respect Bayut’s terms of service and robots.txt.
