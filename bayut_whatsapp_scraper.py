@@ -16,6 +16,8 @@ chrome_options.add_argument("--disable-gpu")
 chrome_options.add_argument("--window-size=1920,1080")
 chrome_options.add_argument("--single-process")
 chrome_options.add_argument("--disable-software-rasterizer")
+
+driver = webdriver.Chrome(options=chrome_options)
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import re
