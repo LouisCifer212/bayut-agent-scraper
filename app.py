@@ -4,7 +4,6 @@ from bayut_whatsapp_scraper import BayutPlaywrightScraper
 
 st.title("Bayut WhatsApp Scraper (Playwright)")
 
-# Location selector
 location = st.selectbox(
     "Select Location:",
     ["ras-al-khaimah", "dubai", "abu-dhabi", "sharjah", "ajman", "fujairah", "umm-al-quwain"],
@@ -12,7 +11,13 @@ location = st.selectbox(
     key="location_select"
 )
 
-max_pages = st.slider("How many pages to scrape?", 1, 10, 1)
+max_pages = st.selectbox(
+    "How many pages to scrape?",
+    options=[str(i) for i in range(1, 51)],
+    index=0,
+    key="max_pages_select"
+)
+max_pages = int(max_pages)
 
 if st.button("Scrape WhatsApp Numbers"):
     st.info(f"Scraping {max_pages} page(s) from {location.replace('-', ' ').title()}... please wait.")
