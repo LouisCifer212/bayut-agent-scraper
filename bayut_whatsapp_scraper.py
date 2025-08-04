@@ -1,6 +1,3 @@
-import chromedriver_autoinstaller
-chromedriver_autoinstaller.install()
-
 """
 Advanced Bayut Scraper with Selenium - Clicks WhatsApp buttons to extract mobile numbers
 """
