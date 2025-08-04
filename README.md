@@ -1,50 +1,54 @@
 # Bayut WhatsApp Scraper (Playwright)
 
-A cloud-friendly Python web app to extract real estate agent WhatsApp numbers from Bayut’s brokers directory, using Playwright and Streamlit.
+Web app Python per estrarre numeri WhatsApp degli agenti immobiliari da Bayut, usando Playwright e Streamlit.  
+Funziona su Render, senza problemi di Chrome/Selenium.
 
-## 🚀 Features
+---
 
-- Scrapes WhatsApp numbers from Bayut agent listings
-- Supports all major UAE locations (Dubai, Abu Dhabi, Ras Al Khaimah, etc.)
-- Scrapes up to 50 pages per location (configurable)
-- Download results as JSON or CSV
-- Runs on Render, no Chrome/Selenium headaches
+## 🚀 Funzionalità
 
-## 📦 Files
+- Estrae numeri WhatsApp dagli annunci agenti su Bayut
+- Supporta tutte le principali città degli Emirati (Dubai, Abu Dhabi, Ras Al Khaimah, ecc.)
+- Puoi scegliere quante pagine analizzare (fino a 50 o più)
+- Download risultati in JSON o CSV
+- Interfaccia web semplice (Streamlit)
 
-- `app.py` — Streamlit web app
-- `bayut_whatsapp_scraper.py` — Playwright-based scraper logic
-- `requirements.txt` — Python dependencies
-- `render.yaml` — Render deployment config
-- `README.md` — This documentation
+---
 
-## 🛠️ Setup
+## 📦 File principali
 
-### 1. **Clone the Repo**
+- `app.py` — Web app Streamlit
+- `bayut_whatsapp_scraper.py` — Logica di scraping Playwright
+- `requirements.txt` — Dipendenze Python
+- `render.yaml` — Configurazione per deploy su Render
+- `README.md` — Questo file
 
-```bash
-git clone https://github.com/yourusername/bayut-agent-scraper.git
-cd bayut-agent-scraper
-2. Install Python Dependencies
+---
+
+## 🛠️ Setup rapido
+
+1. **Clona la repo**
+   ```bash
+   git clone https://github.com/yourusername/bayut-agent-scraper.git
+   cd bayut-agent-scraper
+Installa le dipendenze
 bash
 Copy
 pip install -r requirements.txt
 playwright install chromium
-3. Run the App Locally
+Avvia l'app in locale
 bash
 Copy
 streamlit run app.py
-4. Deploy to Render
-Make sure your repo includes render.yaml with the following build command:
-pip install -r requirements.txt
-playwright install chromium
-Set the start command to:
-streamlit run app.py --server.port $PORT
-⚡ Usage
-Select the location and number of pages in the web app.
-Click "Scrape WhatsApp Numbers".
-Download the results as JSON or CSV.
-📝 Output Example
+Apri il link che appare nel terminale (di solito http://localhost:8501).
+Deploy su Render
+Assicurati che la repo abbia il file render.yaml (vedi esempio sopra).
+Su Render, collega la repo e deploya come Web Service.
+⚡ Uso
+Scegli la città e il numero di pagine da analizzare.
+Clicca "Scrape WhatsApp Numbers".
+Scarica i risultati in JSON o CSV.
+📝 Esempio di output
 json
 Copy
 [
@@ -58,12 +62,8 @@ Copy
     "page": 1
   }
 ]
-💡 Tips
-If you get empty results, try a different location or more pages.
-If the site structure changes, update the selectors in bayut_whatsapp_scraper.py.
-For large scrapes, start with a small number of pages to test.
 ⚠️ Disclaimer
-For personal/research use only.
-Respect Bayut’s terms of service and robots.txt.
-Do not use for spam or unsolicited contact.
-Happy scraping!
+Solo per uso personale/ricerca.
+Rispetta i termini di servizio di Bayut.
+Non usare per spam o contatti non richiesti.
+Buono scraping!
