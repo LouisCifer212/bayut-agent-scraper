@@ -1,270 +1,172 @@
-"""
-Advanced Bayut Scraper with Selenium - Clicks WhatsApp buttons to extract mobile numbers
-"""
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-
-chrome_options = Options()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--window-size=1920,1080")
-chrome_options.add_argument("--single-process")
-chrome_options.add_argument("--disable-software-rasterizer")
-chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-chrome_options.add_argument("--remote-debugging-port=9222")
-
-driver = webdriver.Chrome(options=chrome_options)
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import time
-import re
+import asyncio
+from playwright.async_api import async_playwright
 import json
-from typing import List, Dict
-import logging
+import re
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+class BayutPlaywrightScraper:
+    def __init__(self):
+        self.agents = []
+    
+    async def scrape_whatsapp_numbers(self, location="ras-al-khaimah", max_pages=1):
+        async with async_playwright() as p:
+            # Launch browser
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            
+            try:
+                for page_num in range(1, max_pages + 1):
+                    if page_num == 1:
+                        url = f"https://www.bayut.com/brokers/{location}/"
+                    else:
+                        url = f"https://www.bayut.com/brokers/{location}/page-{page_num}/"
+                    
+                    print(f"Scraping page {page_num}: {url}")
+                    
+                    await page.goto(url, wait_until="networkidle")
+                    
+                    # Wait for the main content to load
+                    await page.wait_for_selector("main", timeout=10000)
+                    
+                    # Find all agent listings following your path
+                    agent_articles = await page.query_selector_all("main ul li article")
+                    print(f"Found {len(agent_articles)} agent articles on page {page_num}")
+                    
+                    if len(agent_articles) == 0:
+                        print(f"No agents found on page {page_num}, stopping pagination")
+                        break
+                    
+                    for i, article in enumerate(agent_articles):
+                        try:
+                            # Get agent name and link
+                            agent_link = await article.query_selector("a[href*='/brokers/']")
+                            if not agent_link:
+                                continue
+                                
+                            agent_name = await agent_link.text_content()
+                            agent_url = await agent_link.get_attribute("href")
+                            
+                            # Try multiple selectors for WhatsApp button
+                            whatsapp_selectors = [
+                                "div[data-testid*='contact'] button[aria-label*='WhatsApp']",
+                                "button[href*='whatsapp']",
+                                "a[href*='whatsapp']",
+                                "button[aria-label*='WhatsApp']",
+                                "[data-testid*='whatsapp']"
+                            ]
+                            
+                            whatsapp_button = None
+                            for selector in whatsapp_selectors:
+                                whatsapp_button = await article.query_selector(selector)
+                                if whatsapp_button:
+                                    break
+                            
+                            if whatsapp_button:
+                                # Get WhatsApp URL
+                                whatsapp_url = await whatsapp_button.get_attribute("href")
+                                
+                                if whatsapp_url and "whatsapp" in whatsapp_url.lower():
+                                    # Extract phone number from WhatsApp URL
+                                    phone_patterns = [
+                                        r'phone=(\+?\d+)',
+                                        r'wa\.me/(\+?\d+)',
+                                        r'whatsapp\.com/send\?phone=(\+?\d+)',
+                                        r'(\+971\d{9})',
+                                        r'(\d{10,})'
+                                    ]
+                                    
+                                    phone_number = None
+                                    for pattern in phone_patterns:
+                                        phone_match = re.search(pattern, whatsapp_url)
+                                        if phone_match:
+                                            phone_number = phone_match.group(1)
+                                            break
+                                    
+                                    if phone_number:
+                                        # Get agency name if available
+                                        agency_element = await article.query_selector("[data-testid*='agency'], .agency-name, [class*='agency']")
+                                        agency_name = await agency_element.text_content() if agency_element else "Unknown Agency"
+                                        
+                                        agent_data = {
+                                            "name": agent_name.strip() if agent_name else "Unknown",
+                                            "agency": agency_name.strip() if agency_name else "Unknown Agency",
+                                            "whatsapp_number": phone_number,
+                                            "profile_link": f"https://www.bayut.com{agent_url}" if agent_url else "",
+                                            "location": location.replace("-", " ").title(),
+                                            "source": "Bayut",
+                                            "page": page_num
+                                        }
+                                        
+                                        self.agents.append(agent_data)
+                                        print(f"Found agent: {agent_name} - {phone_number}")
+                            
+                        except Exception as e:
+                            print(f"Error processing agent {i} on page {page_num}: {e}")
+                            continue
+                    
+                    # Small delay between pages
+                    await asyncio.sleep(2)
+                
+            except Exception as e:
+                print(f"Error during scraping: {e}")
+            
+            finally:
+                await browser.close()
+        
+        return self.agents
 
-class BayutWhatsAppScraper:
-    def __init__(self, headless=True):
-        self.setup_driver(headless)
-        self.agents_data = []
+# Streamlit app
+import streamlit as st
 
-    def setup_driver(self, headless=True):
-        """Setup Chrome driver with options"""
-        chrome_options = Options()
-        if headless:
-            chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+st.title("Bayut WhatsApp Scraper (Playwright)")
 
-        self.driver = webdriver.Chrome(options=chrome_options)
-        self.wait = WebDriverWait(self.driver, 10)
+# Location selector
+location = st.selectbox(
+    "Select Location:",
+    ["ras-al-khaimah", "dubai", "abu-dhabi", "sharjah", "ajman", "fujairah", "umm-al-quwain"],
+    index=0
+)
 
-    def scrape_bayut_brokers(self, location="ras-al-khaimah", max_pages=5):
-        """Scrape brokers from Bayut with WhatsApp number extraction"""
-        base_url = f"https://www.bayut.com/brokers/{location}/"
+# Pages slider
+max_pages = st.slider("How many pages to scrape?", 1, 10, 1)
 
-        try:
-            logger.info(f"Starting scrape of {base_url}")
-            self.driver.get(base_url)
-            time.sleep(3)  # Let page load
-
-            page = 1
-            while page <= max_pages:
-                logger.info(f"Scraping page {page}")
-
-                # Get all broker cards on current page
-                broker_cards = self.get_broker_cards()
-
-                for i, card in enumerate(broker_cards):
-                    try:
-                        agent_data = self.extract_agent_from_card(card, i)
-                        if agent_data:
-                            self.agents_data.append(agent_data)
-                            logger.info(f"✓ Extracted: {agent_data.get('name')} - {agent_data.get('whatsapp_number')}")
-                    except Exception as e:
-                        logger.warning(f"Error processing card {i}: {str(e)}")
-                        continue
-
-                # Try to go to next page
-                if not self.go_to_next_page():
-                    logger.info("No more pages found")
-                    break
-
-                page += 1
-                time.sleep(2)
-
-        except Exception as e:
-            logger.error(f"Error during scraping: {str(e)}")
-        finally:
-            self.driver.quit()
-
-        return self.agents_data
-
-    def get_broker_cards(self):
-        """Get all broker cards on current page"""
-        try:
-            # Wait for broker cards to load
-            self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='broker-card']")))
-            cards = self.driver.find_elements(By.CSS_SELECTOR, "[data-testid='broker-card']")
-            logger.info(f"Found {len(cards)} broker cards on page")
-            return cards
-        except TimeoutException:
-            logger.warning("No broker cards found on page")
-            return []
-
-    def extract_agent_from_card(self, card, card_index):
-        """Extract agent data from a single broker card"""
-        agent_data = {
-            'name': '',
-            'agency': '',
-            'whatsapp_number': '',
-            'profile_link': '',
-            'location': 'Ras Al Khaimah',
-            'source': 'Bayut'
-        }
-
-        try:
-            # Extract name
-            name_elem = card.find_element(By.CSS_SELECTOR, "h3, h4, .broker-name, [data-testid='broker-name']")
-            agent_data['name'] = name_elem.text.strip()
-        except NoSuchElementException:
-            logger.warning(f"No name found for card {card_index}")
-
-        try:
-            # Extract agency
-            agency_elem = card.find_element(By.CSS_SELECTOR, ".agency-name, .company-name, [data-testid='agency-name']")
-            agent_data['agency'] = agency_elem.text.strip()
-        except NoSuchElementException:
-            pass
-
-        try:
-            # Extract profile link
-            profile_link = card.find_element(By.CSS_SELECTOR, "a[href*='/brokers/']")
-            agent_data['profile_link'] = profile_link.get_attribute('href')
-        except NoSuchElementException:
-            pass
-
-        # Extract WhatsApp number - this is the key part!
-        whatsapp_number = self.extract_whatsapp_number(card, card_index)
-        agent_data['whatsapp_number'] = whatsapp_number
-
-        # Only return if we have name and WhatsApp number
-        if agent_data['name'] and agent_data['whatsapp_number']:
-            return agent_data
-
-        return None
-
-    def extract_whatsapp_number(self, card, card_index):
-        """Extract WhatsApp number by finding and processing WhatsApp links"""
-        try:
-            # Method 1: Look for existing WhatsApp links in the HTML
-            whatsapp_links = card.find_elements(By.CSS_SELECTOR, "a[href*='api.whatsapp.com']")
-
-            for link in whatsapp_links:
-                href = link.get_attribute('href')
-                number = self.parse_whatsapp_url(href)
-                if number:
-                    return number
-
-            # Method 2: Look for WhatsApp buttons and click them
-            whatsapp_buttons = card.find_elements(By.CSS_SELECTOR, 
-                "button[aria-label*='WhatsApp'], button[title*='WhatsApp'], .whatsapp-btn, [data-testid*='whatsapp']")
-
-            for button in whatsapp_buttons:
-                try:
-                    # Scroll to button and click
-                    self.driver.execute_script("arguments[0].scrollIntoView(true);", button)
-                    time.sleep(0.5)
-                    button.click()
-                    time.sleep(1)
-
-                    # Check if a WhatsApp link appeared
-                    whatsapp_links = card.find_elements(By.CSS_SELECTOR, "a[href*='api.whatsapp.com']")
-                    for link in whatsapp_links:
-                        href = link.get_attribute('href')
-                        number = self.parse_whatsapp_url(href)
-                        if number:
-                            return number
-
-                except Exception as e:
-                    logger.debug(f"Error clicking WhatsApp button: {str(e)}")
-                    continue
-
-            # Method 3: Look for phone number patterns in onclick handlers or data attributes
-            clickable_elements = card.find_elements(By.CSS_SELECTOR, "[onclick*='whatsapp'], [data-phone], .phone-btn")
-
-            for elem in clickable_elements:
-                onclick = elem.get_attribute('onclick') or ''
-                data_phone = elem.get_attribute('data-phone') or ''
-
-                # Look for phone numbers in these attributes
-                for text in [onclick, data_phone]:
-                    if text:
-                        phone_match = re.search(r'971\d{9}', text)
-                        if phone_match:
-                            return '+' + phone_match.group()
-
-        except Exception as e:
-            logger.debug(f"Error extracting WhatsApp number from card {card_index}: {str(e)}")
-
-        return ''
-
-    def parse_whatsapp_url(self, url):
-        """Parse phone number from WhatsApp URL"""
-        if not url:
-            return ''
-
-        # Extract phone number from URL like: https://api.whatsapp.com/send/?phone=971545695868&text=...
-        match = re.search(r'phone=(\d+)', url)
-        if match:
-            phone = match.group(1)
-            # Ensure it starts with +
-            if not phone.startswith('+'):
-                phone = '+' + phone
-            return phone
-
-        return ''
-
-    def go_to_next_page(self):
-        """Navigate to next page if available"""
-        try:
-            # Look for next page button
-            next_buttons = self.driver.find_elements(By.CSS_SELECTOR, 
-                "a[aria-label='Next'], button[aria-label='Next'], .pagination-next, [data-testid='pagination-next']")
-
-            for button in next_buttons:
-                if button.is_enabled() and button.is_displayed():
-                    self.driver.execute_script("arguments[0].click();", button)
-                    time.sleep(3)
-                    return True
-
-            return False
-
-        except Exception as e:
-            logger.debug(f"Error navigating to next page: {str(e)}")
-            return False
-
-    def save_results(self, filename="bayut_agents_whatsapp.json"):
-        """Save results to JSON file"""
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(self.agents_data, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"Saved {len(self.agents_data)} agents to {filename}")
-        return filename
-
-# Usage example
-def main():
-    scraper = BayutWhatsAppScraper(headless=False)  # Set to True for headless mode
-
-    try:
-        agents = scraper.scrape_bayut_brokers(location="ras-al-khaimah", max_pages=3)
-
-        print(f"\n🎉 Successfully scraped {len(agents)} agents with WhatsApp numbers!")
-
-        # Show sample results
-        for i, agent in enumerate(agents[:5]):  # Show first 5
-            print(f"\n{i+1}. {agent['name']}")
-            print(f"   Agency: {agent['agency']}")
-            print(f"   WhatsApp: {agent['whatsapp_number']}")
-            print(f"   Profile: {agent['profile_link']}")
-
-        # Save results
-        filename = scraper.save_results()
-        print(f"\n💾 Results saved to: {filename}")
-
-    except Exception as e:
-        logger.error(f"Scraping failed: {str(e)}")
-
-if __name__ == "__main__":
-    main()
+if st.button("Scrape WhatsApp Numbers"):
+    st.info(f"Scraping {max_pages} page(s) from {location.replace('-', ' ').title()}... please wait.")
+    
+    scraper = BayutPlaywrightScraper()
+    
+    # Run async function in Streamlit
+    agents = asyncio.run(scraper.scrape_whatsapp_numbers(location=location, max_pages=max_pages))
+    
+    st.success(f"Found {len(agents)} agents with WhatsApp numbers!")
+    
+    if agents:
+        # Show summary
+        st.write(f"**Summary:**")
+        st.write(f"- Total agents: {len(agents)}")
+        st.write(f"- Location: {location.replace('-', ' ').title()}")
+        st.write(f"- Pages scraped: {max_pages}")
+        
+        # Show results
+        st.json(agents)
+        
+        # Download options
+        json_data = json.dumps(agents, indent=2)
+        st.download_button(
+            label="Download as JSON",
+            data=json_data,
+            file_name=f"bayut_agents_{location}_{max_pages}pages.json",
+            mime="application/json"
+        )
+        
+        # Convert to CSV for Excel
+        import pandas as pd
+        df = pd.DataFrame(agents)
+        csv_data = df.to_csv(index=False)
+        st.download_button(
+            label="Download as CSV",
+            data=csv_data,
+            file_name=f"bayut_agents_{location}_{max_pages}pages.csv",
+            mime="text/csv"
+        )
+    else:
+        st.warning("No agents found. Try a different location or check if the website structure has changed.")
