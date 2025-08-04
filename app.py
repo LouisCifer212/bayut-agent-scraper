@@ -19,6 +19,7 @@ max_pages = st.selectbox(
 )
 max_pages = int(max_pages)
 
+if st.button("Scrape WhatsApp Numbers", key="scrape_button"):
     st.info(f"Scraping {max_pages} page(s) from {location.replace('-', ' ').title()}... please wait.")
     scraper = BayutPlaywrightScraper()
     agents = asyncio.run(scraper.scrape_whatsapp_numbers(location=location, max_pages=max_pages))
