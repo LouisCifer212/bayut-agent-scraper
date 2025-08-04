@@ -10,7 +10,7 @@ class BayutPlaywrightScraper:
     async def scrape_whatsapp_numbers(self, location="ras-al-khaimah", max_pages=1):
         async with async_playwright() as p:
             # Launch browser
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(headless=True, channel="chrome")
             page = await browser.new_page()
             
             try:
