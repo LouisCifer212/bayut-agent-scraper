@@ -9,8 +9,11 @@ class BayutPlaywrightScraper:
     
     async def scrape_whatsapp_numbers(self, location="ras-al-khaimah", max_pages=1):
         async with async_playwright() as p:
-            # Launch browser
-            browser = await p.chromium.launch(headless=True, channel="chrome")
+            # Launch browser with correct arguments for cloud deployment
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"]
+            )
             page = await browser.new_page()
             
             try:
@@ -51,7 +54,9 @@ class BayutPlaywrightScraper:
                                 "button[href*='whatsapp']",
                                 "a[href*='whatsapp']",
                                 "button[aria-label*='WhatsApp']",
-                                "[data-testid*='whatsapp']"
+                                "[data-testid*='whatsapp']",
+                                "button[data-testid*='whatsapp']",
+                                "a[data-testid*='whatsapp']"
                             ]
                             
                             whatsapp_button = None
@@ -113,60 +118,3 @@ class BayutPlaywrightScraper:
                 await browser.close()
         
         return self.agents
-
-# Streamlit app
-import streamlit as st
-
-st.title("Bayut WhatsApp Scraper (Playwright)")
-
-# Location selector
-location = st.selectbox(
-    "Select Location:",
-    ["ras-al-khaimah", "dubai", "abu-dhabi", "sharjah", "ajman", "fujairah", "umm-al-quwain"],
-    index=0
-)
-
-# Pages slider
-max_pages = st.slider("How many pages to scrape?", 1, 10, 1)
-
-if st.button("Scrape WhatsApp Numbers"):
-    st.info(f"Scraping {max_pages} page(s) from {location.replace('-', ' ').title()}... please wait.")
-    
-    scraper = BayutPlaywrightScraper()
-    
-    # Run async function in Streamlit
-    agents = asyncio.run(scraper.scrape_whatsapp_numbers(location=location, max_pages=max_pages))
-    
-    st.success(f"Found {len(agents)} agents with WhatsApp numbers!")
-    
-    if agents:
-        # Show summary
-        st.write(f"**Summary:**")
-        st.write(f"- Total agents: {len(agents)}")
-        st.write(f"- Location: {location.replace('-', ' ').title()}")
-        st.write(f"- Pages scraped: {max_pages}")
-        
-        # Show results
-        st.json(agents)
-        
-        # Download options
-        json_data = json.dumps(agents, indent=2)
-        st.download_button(
-            label="Download as JSON",
-            data=json_data,
-            file_name=f"bayut_agents_{location}_{max_pages}pages.json",
-            mime="application/json"
-        )
-        
-        # Convert to CSV for Excel
-        import pandas as pd
-        df = pd.DataFrame(agents)
-        csv_data = df.to_csv(index=False)
-        st.download_button(
-            label="Download as CSV",
-            data=csv_data,
-            file_name=f"bayut_agents_{location}_{max_pages}pages.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("No agents found. Try a different location or check if the website structure has changed.")
