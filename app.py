@@ -8,7 +8,8 @@ st.title("Bayut WhatsApp Scraper (Playwright)")
 location = st.selectbox(
     "Select Location:",
     ["ras-al-khaimah", "dubai", "abu-dhabi", "sharjah", "ajman", "fujairah", "umm-al-quwain"],
-    index=0
+    index=0,
+    key="location_select"
 )
 
 max_pages = st.slider("How many pages to scrape?", 1, 10, 1)
