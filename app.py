@@ -24,4 +24,37 @@ if st.button("Scrape WhatsApp Numbers", key="scrape_button"):
     scraper = BayutPlaywrightScraper()
     agents = asyncio.run(scraper.scrape_whatsapp_numbers(location=location, max_pages=max_pages))
     st.success(f"Found {len(agents)} agents with WhatsApp numbers!")
-    st.json(agents)
+    
+    if agents:
+        # Show summary
+        st.write(f"**Summary:**")
+        st.write(f"- Total agents: {len(agents)}")
+        st.write(f"- Location: {location.replace('-', ' ').title()}")
+        st.write(f"- Pages scraped: {max_pages}")
+        
+        # Show results
+        st.json(agents)
+        
+        # Download options
+        import json
+        import pandas as pd
+        
+        json_data = json.dumps(agents, indent=2)
+        st.download_button(
+            label="Download as JSON",
+            data=json_data,
+            file_name=f"bayut_agents_{location}_{max_pages}pages.json",
+            mime="application/json"
+        )
+        
+        # Convert to CSV for Excel
+        df = pd.DataFrame(agents)
+        csv_data = df.to_csv(index=False)
+        st.download_button(
+            label="Download as CSV",
+            data=csv_data,
+            file_name=f"bayut_agents_{location}_{max_pages}pages.csv",
+            mime="text/csv"
+        )
+    else:
+        st.warning("No agents found. Try a different location or check if the website structure has changed.")
