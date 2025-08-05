@@ -15,7 +15,7 @@ except Exception:
 
 import streamlit as st
 import asyncio
-from bayut_whatsapp_scraper import BayutScraper
+from bayut_whatsapp_scraper import BayutPlaywrightScraper as BayutScraper
 
 st.set_page_config(
     page_title="Bayut WhatsApp Scraper",
