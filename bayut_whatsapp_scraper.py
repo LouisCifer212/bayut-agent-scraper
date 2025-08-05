@@ -9,12 +9,19 @@ class BayutPlaywrightScraper:
     
     async def scrape_whatsapp_numbers(self, location="ras-al-khaimah", max_pages=1):
         async with async_playwright() as p:
-            # Launch browser with correct arguments for cloud deployment
             browser = await p.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled"
+                ]
             )
             page = await browser.new_page()
+            # User-Agent "umano"
+            await page.set_user_agent(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
             
             try:
                 for page_num in range(1, max_pages + 1):
@@ -25,12 +32,22 @@ class BayutPlaywrightScraper:
                     
                     print(f"Scraping page {page_num}: {url}")
                     
-                    await page.goto(url, wait_until="networkidle")
+                    await page.goto(url, wait_until="networkidle", timeout=30000)
+                    await asyncio.sleep(3)  # Attendi un po' di più per caricamento
+                    
+                    # Salva la pagina per debug
+                    content = await page.content()
+                    with open(f"page_{page_num}.html", "w", encoding="utf-8") as f:
+                        f.write(content)
+                    print(f"Salvata page_{page_num}.html per debug")
                     
                     # Wait for the main content to load
-                    await page.wait_for_selector("main", timeout=10000)
+                    try:
+                        await page.wait_for_selector("main", timeout=20000)
+                    except Exception as e:
+                        print(f"Main selector non trovato: {e}")
+                        continue
                     
-                    # Find all agent listings following your path
                     agent_articles = await page.query_selector_all("main ul li article")
                     print(f"Found {len(agent_articles)} agent articles on page {page_num}")
                     
@@ -40,7 +57,6 @@ class BayutPlaywrightScraper:
                     
                     for i, article in enumerate(agent_articles):
                         try:
-                            # Get agent name and link
                             agent_link = await article.query_selector("a[href*='/brokers/']")
                             if not agent_link:
                                 continue
@@ -48,7 +64,6 @@ class BayutPlaywrightScraper:
                             agent_name = await agent_link.text_content()
                             agent_url = await agent_link.get_attribute("href")
                             
-                            # Try multiple selectors for WhatsApp button
                             whatsapp_selectors = [
                                 "div[data-testid*='contact'] button[aria-label*='WhatsApp']",
                                 "button[href*='whatsapp']",
@@ -66,11 +81,9 @@ class BayutPlaywrightScraper:
                                     break
                             
                             if whatsapp_button:
-                                # Get WhatsApp URL
                                 whatsapp_url = await whatsapp_button.get_attribute("href")
                                 
                                 if whatsapp_url and "whatsapp" in whatsapp_url.lower():
-                                    # Extract phone number from WhatsApp URL
                                     phone_patterns = [
                                         r'phone=(\+?\d+)',
                                         r'wa\.me/(\+?\d+)',
@@ -87,7 +100,6 @@ class BayutPlaywrightScraper:
                                             break
                                     
                                     if phone_number:
-                                        # Get agency name if available
                                         agency_element = await article.query_selector("[data-testid*='agency'], .agency-name, [class*='agency']")
                                         agency_name = await agency_element.text_content() if agency_element else "Unknown Agency"
                                         
@@ -108,7 +120,6 @@ class BayutPlaywrightScraper:
                             print(f"Error processing agent {i} on page {page_num}: {e}")
                             continue
                     
-                    # Small delay between pages
                     await asyncio.sleep(2)
                 
             except Exception as e:
