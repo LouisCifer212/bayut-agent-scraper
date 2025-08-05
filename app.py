@@ -36,7 +36,13 @@ location = st.sidebar.selectbox(
 
 max_pages = st.sidebar.slider("Max Pages to Scrape:", 1, 10, 3)
 
-if st.sidebar.button("Start Scraping", key="scrape_button"):
+if st.sidebar.button("Scarica HTML pagina 1 (debug)"):
+    try:
+        with open("page_1.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+        st.download_button("Download page_1.html", html_content, file_name="page_1.html")
+    except Exception as e:
+        st.error(f"Errore nel download: {e}")
     with st.spinner("Scraping WhatsApp numbers..."):
         try:
             scraper = BayutScraper()
