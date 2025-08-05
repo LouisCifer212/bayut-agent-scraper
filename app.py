@@ -36,6 +36,7 @@ location = st.sidebar.selectbox(
 
 max_pages = st.sidebar.slider("Max Pages to Scrape:", 1, 10, 3)
 
+# Debug button (separato!)
 if st.sidebar.button("Scarica HTML pagina 1 (debug)"):
     try:
         with open("page_1.html", "r", encoding="utf-8") as f:
@@ -43,14 +44,17 @@ if st.sidebar.button("Scarica HTML pagina 1 (debug)"):
         st.download_button("Download page_1.html", html_content, file_name="page_1.html")
     except Exception as e:
         st.error(f"Errore nel download: {e}")
+
+# Main scraping button (separato!)
+if st.sidebar.button("Start Scraping", key="scrape_button"):
     with st.spinner("Scraping WhatsApp numbers..."):
         try:
             scraper = BayutScraper()
             agents = asyncio.run(scraper.scrape_whatsapp_numbers(location=location, max_pages=max_pages))
-            
+
             if agents:
                 st.success(f"Found {len(agents)} agents with WhatsApp numbers!")
-                
+
                 # Display results
                 for i, agent in enumerate(agents, 1):
                     with st.expander(f"Agent {i}: {agent['name']}"):
@@ -62,7 +66,7 @@ if st.sidebar.button("Scarica HTML pagina 1 (debug)"):
                         with col2:
                             if agent['image']:
                                 st.image(agent['image'], width=100)
-                
+
                 # Download CSV
                 import pandas as pd
                 df = pd.DataFrame(agents)
@@ -75,7 +79,7 @@ if st.sidebar.button("Scarica HTML pagina 1 (debug)"):
                 )
             else:
                 st.warning("No agents with WhatsApp numbers found.")
-                
+
         except Exception as e:
             st.error(f"Error occurred: {str(e)}")
             st.error("Please check the logs for more details.")
