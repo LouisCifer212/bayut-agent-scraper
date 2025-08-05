@@ -1,3 +1,5 @@
+import os
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/.cache/ms-playwright"
 import streamlit as st
 import asyncio
 from bayut_whatsapp_scraper import BayutPlaywrightScraper
