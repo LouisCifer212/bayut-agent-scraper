@@ -1,63 +1,94 @@
 import os
+import subprocess
+import sys
+
+# Forza il path di Playwright
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/.cache/ms-playwright"
+
+# Installa Chromium al runtime se manca
+try:
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        p.chromium.launch(headless=True)
+except Exception:
+    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
 
 import streamlit as st
 import asyncio
-from bayut_whatsapp_scraper import BayutPlaywrightScraper
+from bayut_whatsapp_scraper import BayutScraper
 
-st.title("Bayut WhatsApp Scraper (Playwright)")
+st.set_page_config(
+    page_title="Bayut WhatsApp Scraper",
+    page_icon="🏠",
+    layout="wide"
+)
 
-location = st.selectbox(
+st.title("🏠 Bayut WhatsApp Scraper")
+st.markdown("Extract WhatsApp numbers from Bayut real estate agents")
+
+# Sidebar controls
+st.sidebar.header("Settings")
+location = st.sidebar.selectbox(
     "Select Location:",
     ["ras-al-khaimah", "dubai", "abu-dhabi", "sharjah", "ajman", "fujairah", "umm-al-quwain"],
-    index=0,
     key="location_select"
 )
 
-max_pages = st.selectbox(
-    "How many pages to scrape?",
-    options=[str(i) for i in range(1, 51)],
-    index=0,
-    key="max_pages_select"
-)
-max_pages = int(max_pages)
+max_pages = st.sidebar.slider("Max Pages to Scrape:", 1, 10, 3)
 
-if st.button("Scrape WhatsApp Numbers", key="scrape_button"):
-    st.info(f"Scraping {max_pages} page(s) from {location.replace('-', ' ').title()}... please wait.")
-    scraper = BayutPlaywrightScraper()
-    agents = asyncio.run(scraper.scrape_whatsapp_numbers(location=location, max_pages=max_pages))
-    st.success(f"Found {len(agents)} agents with WhatsApp numbers!")
-    
-    if agents:
-        # Show summary
-        st.write(f"**Summary:**")
-        st.write(f"- Total agents: {len(agents)}")
-        st.write(f"- Location: {location.replace('-', ' ').title()}")
-        st.write(f"- Pages scraped: {max_pages}")
-        
-        # Show results
-        st.json(agents)
-        
-        # Download options
-        import json
-        import pandas as pd
-        
-        json_data = json.dumps(agents, indent=2)
-        st.download_button(
-            label="Download as JSON",
-            data=json_data,
-            file_name=f"bayut_agents_{location}_{max_pages}pages.json",
-            mime="application/json"
-        )
-        
-        # Convert to CSV for Excel
-        df = pd.DataFrame(agents)
-        csv_data = df.to_csv(index=False)
-        st.download_button(
-            label="Download as CSV",
-            data=csv_data,
-            file_name=f"bayut_agents_{location}_{max_pages}pages.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("No agents found. Try a different location or check if the website structure has changed.")
+if st.sidebar.button("Start Scraping", key="scrape_button"):
+    with st.spinner("Scraping WhatsApp numbers..."):
+        try:
+            scraper = BayutScraper()
+            agents = asyncio.run(scraper.scrape_whatsapp_numbers(location=location, max_pages=max_pages))
+            
+            if agents:
+                st.success(f"Found {len(agents)} agents with WhatsApp numbers!")
+                
+                # Display results
+                for i, agent in enumerate(agents, 1):
+                    with st.expander(f"Agent {i}: {agent['name']}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Name:** {agent['name']}")
+                            st.write(f"**Phone:** {agent['phone']}")
+                            st.write(f"**WhatsApp:** {agent['whatsapp']}")
+                        with col2:
+                            if agent['image']:
+                                st.image(agent['image'], width=100)
+                
+                # Download CSV
+                import pandas as pd
+                df = pd.DataFrame(agents)
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="Download CSV",
+                    data=csv,
+                    file_name=f"bayut_agents_{location}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.warning("No agents with WhatsApp numbers found.")
+                
+        except Exception as e:
+            st.error(f"Error occurred: {str(e)}")
+            st.error("Please check the logs for more details.")
+
+# Instructions
+st.markdown("---")
+st.markdown("""
+### How to use:
+1. Select a location from the dropdown
+2. Choose how many pages to scrape (1-10)
+3. Click "Start Scraping"
+4. Wait for results and download CSV if needed
+
+### Supported Locations:
+- Ras Al Khaimah
+- Dubai
+- Abu Dhabi
+- Sharjah
+- Ajman
+- Fujairah
+- Umm Al Quwain
+""")
